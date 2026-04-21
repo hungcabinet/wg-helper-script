@@ -44,7 +44,7 @@ def add_init_cmd(subparsers: argparse._SubParsersAction) -> None:
     def add_amn_opt(flag: str) -> None:
         amn.add_argument(f"--amnezia-{flag}", default=None)
 
-    for k in ("jc", "jmin", "jmax", "s1", "s2", "h1", "h2", "h3", "h4", "i1", "i2", "i3", "i4", "i5"):
+    for k in ("jc", "jmin", "jmax", "s1", "s2", "s3", "s4", "h1", "h2", "h3", "h4", "i1", "i2", "i3", "i4", "i5"):
         add_amn_opt(k)
 
     # Server block

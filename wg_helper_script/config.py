@@ -31,6 +31,8 @@ class AmneziaConfig:
     Jmax: Optional[str] = None
     S1: Optional[str] = None
     S2: Optional[str] = None
+    S3: Optional[str] = None
+    S4: Optional[str] = None
     H1: Optional[str] = None
     H2: Optional[str] = None
     H3: Optional[str] = None
@@ -53,6 +55,8 @@ class AmneziaConfig:
             Jmax=am.get("JMAX"),
             S1=am.get("S1"),
             S2=am.get("S2"),
+            S3=am.get("S3"),
+            S4=am.get("S4"),
             H1=am.get("H1"),
             H2=am.get("H2"),
             H3=am.get("H3"),
@@ -73,6 +77,8 @@ class AmneziaConfig:
             ("Jmax", "amnezia_jmax"),
             ("S1", "amnezia_s1"),
             ("S2", "amnezia_s2"),
+            ("S3", "amnezia_s3"),
+            ("S4", "amnezia_s4"),
             ("H1", "amnezia_h1"),
             ("H2", "amnezia_h2"),
             ("H3", "amnezia_h3"),
@@ -114,6 +120,13 @@ class AmneziaConfig:
             # choose S2 avoiding S1 + 56
             choices = [x for x in range(15, 151) if x != s1 + 56]
             self.S2 = str(random.choice(choices))
+        if self.S3 is None:
+            self.S3 = str(random.randint(15, 150))
+        s3 = _to_int(self.S3) or 64
+        if self.S4 is None:
+            # choose S4 avoiding S3 + 56
+            choices = [x for x in range(0, 16) if x != s3 + 56]
+            self.S4 = str(random.choice(choices))
 
         # H1..H4 unique, within recommended domain (use a modest range)
         hs = [self.H1, self.H2, self.H3, self.H4]
@@ -148,6 +161,8 @@ class AmneziaConfig:
                 errs.append("amnezia.Jmax must be ≤ 1280")
         s1 = _to_int(self.S1)
         s2 = _to_int(self.S2)
+        s3 = _to_int(self.S3)
+        s4 = _to_int(self.S4)
         if s1 is None:
             errs.append("amnezia.S1 must be set")
         else:
@@ -160,16 +175,68 @@ class AmneziaConfig:
                 errs.append("amnezia.S2 must be ≤ 1188")
         if s1 is not None and s2 is not None and (s1 + 56 == s2):
             errs.append("amnezia.S1 + 56 must not equal S2")
+        if s3 is None:
+            errs.append("amnezia.S3 must be set")
+        else:
+            if not (0 <= s3 <= 1216):
+                errs.append("amnezia.S3 must be between 0 and 1216")
+        if s4 is None:
+            errs.append("amnezia.S4 must be set")
+        else:
+            if not (0 <= s4 <= 32):
+                errs.append("amnezia.S4 must be between 0 and 32")
+        if s3 is not None and s4 is not None and (s3 + 56 == s4):
+            errs.append("amnezia.S3 + 56 must not equal S4")
         hs = [self.H1, self.H2, self.H3, self.H4]
-        ints: List[int] = []
+        ranges: list[tuple[int, int]] = []
+
         for idx, hv in enumerate(hs, start=1):
-            iv = _to_int(hv)
-            if iv is None:
-                errs.append(f"amnezia.H{idx} must be set and integer")
-            else:
-                ints.append(iv)
-        if len(set(ints)) != len(ints):
-            errs.append("amnezia.H1..H4 must be unique")
+            if hv is None:
+                errs.append(f"amnezia.H{idx} must be set and integer or range")
+                continue
+
+            try:
+                s = str(hv).strip()
+
+                # диапазон
+                if "-" in s:
+                    parts = s.split("-", 1)
+
+                    if len(parts) != 2:
+                        raise ValueError()
+
+                    start_i = int(parts[0])
+                    end_i = int(parts[1])
+
+                    if start_i > end_i:
+                        errs.append(
+                            f"amnezia.H{idx} range start must be <= end"
+                        )
+                        continue
+
+                else:
+                    # одиночное число → диапазон
+                    start_i = end_i = int(s)
+
+                ranges.append((start_i, end_i))
+
+            except ValueError:
+                errs.append(
+                    f"amnezia.H{idx} must be integer or range int-int"
+                )
+
+        # проверка пересечений диапазонов
+        ranges.sort()
+
+        for i in range(1, len(ranges)):
+            prev_start, prev_end = ranges[i - 1]
+            curr_start, curr_end = ranges[i]
+
+            if curr_start <= prev_end:
+                errs.append(
+                    "amnezia.H1..H4 ranges must be unique and not overlap"
+                )
+                break
         return errs
 
 
@@ -576,7 +643,7 @@ def to_yaml_dict(cfg: RootConfig) -> Dict[str, Any]:
     }
     # Amnezia: include only non-None fields
     amn_map: Dict[str, Any] = {"enabled": amn.enabled}
-    for k in ("Jc", "Jmin", "Jmax", "S1", "S2", "H1", "H2", "H3", "H4", "I1", "I2", "I3", "I4", "I5"):
+    for k in ("Jc", "Jmin", "Jmax", "S1", "S2", "S3", "S4", "H1", "H2", "H3", "H4", "I1", "I2", "I3", "I4", "I5"):
         v = getattr(amn, k)
         if v is not None:
             amn_map[k] = v
@@ -657,6 +724,8 @@ def parse_root_config(data: Dict[str, Any]) -> RootConfig:
         Jmax=amn_map.get("Jmax"),
         S1=amn_map.get("S1"),
         S2=amn_map.get("S2"),
+        S3=amn_map.get("S3"),
+        S4=amn_map.get("S4"),
         H1=amn_map.get("H1"),
         H2=amn_map.get("H2"),
         H3=amn_map.get("H3"),

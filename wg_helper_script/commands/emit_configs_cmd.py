@@ -158,6 +158,8 @@ def _render_server_conf(cfg: RootConfig, cfg_path: str) -> str:
             "Jmax",
             "S1",
             "S2",
+            "S3",
+            "S4",
             "H1",
             "H2",
             "H3",
@@ -233,6 +235,8 @@ def _render_client_conf(
     lines.append(f"PrivateKey = {c.private_key}\n")
     addr = c.address if "/" in c.address else f"{c.address}/32"
     lines.append(f"Address = {addr}\n")
+    if s.mtu:
+        lines.append(f"MTU = {s.mtu}\n")
     selected_dns = client_dns if client_dns is not None else cfg.server.dns
     if selected_dns:
         dns_str = ", ".join(selected_dns)
@@ -245,6 +249,8 @@ def _render_client_conf(
             "Jmax",
             "S1",
             "S2",
+            "S3",
+            "S4",
             "H1",
             "H2",
             "H3",
